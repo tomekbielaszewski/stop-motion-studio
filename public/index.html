@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stop Motion Studio</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div><span class="logo">◉</span><strong>Stop Motion Studio</strong><span class="tag">FRAME BY FRAME</span></div><div><label class="button">Import project<input id="importProject" type="file" accept="application/json,.json" hidden></label><button id="exportProject">Save project</button><button id="exportTop" class="primary">Export video ↗</button></div></header>
+<main>
+  <section class="workspace">
+    <div class="section-title"><div><span class="eyebrow">EDITOR</span><h1>Bring your story to life.</h1><p>Arrange your frames and get every detail in place.</p></div><label class="button upload">＋ Add photos<input id="files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label></div>
+    <div class="editor-layout">
+      <div class="stage-column">
+        <div class="stage-toolbar"><span><span class="status-dot"></span> CANVAS</span><span id="frameLabel">No frame selected</span></div>
+        <div class="stage-wrap"><canvas id="canvas" width="1920" height="1080"></canvas><div id="empty" class="empty"><div class="empty-icon">▧</div><h2>Your canvas awaits</h2><p>Add photos to start creating your stop motion.</p><label class="button">＋ Add photos<input id="emptyFiles" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label></div></div>
+        <div class="stage-footer"><span>✥ Drag image to reposition</span><label><input type="checkbox" id="grid"> Show grid</label><span id="canvasSize">1920 × 1080</span></div>
+      </div>
+      <aside>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">FINE TUNE</span><h2>Frame alignment</h2></div><span>⌖</span></div><p class="hint">Select a frame, then drag it on the canvas or adjust it below.</p>
+          <label>Scale <span id="scaleValue">100%</span><input id="scale" type="range" min="0.1" max="3" step="0.01" value="1"></label>
+          <label>Rotation <span id="rotationValue">0°</span><input id="rotation" type="range" min="-360" max="360" step="1" value="0"><small>Degrees clockwise</small></label>
+          <div class="coordinates"><label>X offset <input id="x" type="number" step="0.1" value="0"><small>% of canvas</small></label><label>Y offset <input id="y" type="number" step="0.1" value="0"><small>% of canvas</small></label></div>
+          <button id="reset" class="subtle wide">↺ Reset alignment</button>
+        </div>
+        <div class="panel"><div class="panel-heading"><div><span class="eyebrow">ONION SKIN</span><h2>Frame overlay</h2></div><span>◈</span></div><p class="hint">See adjacent frames to line up your shot.</p><div class="toggle-row"><label><input type="checkbox" id="previous"> Previous frame</label><label><input type="checkbox" id="next"> Next frame</label></div><label>Overlay opacity <span id="opacityValue">40%</span><input id="opacity" type="range" min="0" max="100" value="40"></label></div>
+      </aside>
+    </div>
+    <div class="timeline-heading"><div><span class="eyebrow">YOUR SEQUENCE</span><h2>Frames <span id="count" class="count">0</span></h2></div><div class="timeline-actions"><button id="play" class="subtle">▶ Preview</button><button id="left" class="subtle" title="Move frame earlier">←</button><button id="right" class="subtle" title="Move frame later">→</button><button id="remove" class="subtle" title="Remove frame">✕</button></div></div>
+    <div id="timeline" class="timeline"><div class="timeline-empty">Your frames will appear here. Add some photos to get started.</div></div>
+  </section>
+</main>
+<dialog id="exportDialog"><form id="renderForm"><div class="modal-head"><div><span class="eyebrow">THE FINAL CUT</span><h2>Export video</h2></div><button type="button" id="close" class="icon-button">✕</button></div><p class="hint">Choose your output settings. Your alignment is baked into every frame.</p><div class="settings"><label>Width <input id="width" type="number" min="64" max="3840" step="2" value="1920" required></label><label>Height <input id="height" type="number" min="64" max="3840" step="2" value="1080" required></label><label>Frame rate (fps) <input id="fps" type="number" min="1" max="60" value="24" required></label><label>Seconds per photo <input id="duration" type="number" min="0.02" max="60" step="0.01" value="0.25" required></label><label class="full">Quality (CRF) <input id="crf" type="number" min="0" max="51" value="18" required><small>Lower is better quality and a larger file. 18–23 is recommended.</small></label></div><div id="renderStatus" class="render-status"></div><button id="renderButton" class="primary wide" type="submit">Render MP4</button><a id="download" class="button primary wide" hidden>↓ Download video</a></form></dialog>
+<div id="toast" role="status"></div><script src="app.js"></script></body></html>
