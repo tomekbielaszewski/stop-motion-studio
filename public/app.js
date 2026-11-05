@@ -31,7 +31,7 @@ function applyProject(project) {
   dragging = null;
   for (const id of settingsIds) { if ($(id).type === 'checkbox') $(id).checked = project.settings[id]; else $(id).value = project.settings[id]; }
   canvas.width = +$('width').value; canvas.height = +$('height').value; $('opacityValue').textContent = $('opacity').value + '%';
-  frames = project.frames.map(f => { const image = new Image(); image.onload = draw; image.onerror = () => toast('A saved photo is unavailable on the server. Import a project backup to restore it.'); image.src = f.url; return { ...f, image }; });
+  frames = project.frames.map(f => { const image = new Image(); image.onload = draw; image.onerror = () => toast('A saved photo is unavailable on the server. Import a project backup to restore it.'); image.src = f.url; const rotation = f.rotation > 180 ? f.rotation - 360 : f.rotation < -180 ? f.rotation + 360 : f.rotation; return { ...f, rotation, image }; });
   selected = project.selected; refresh();
 }
 function blobData(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); }); }
