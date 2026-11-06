@@ -2,7 +2,7 @@ const $ = id => document.getElementById(id);
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
 let frames = [], selected = -1, playing = null, dragging = null;
 const storageKey = 'stopmotion-project-v1';
-const settingsIds = ['width', 'height', 'fps', 'duration', 'crf', 'opacity', 'previous', 'next', 'grid'];
+const settingsIds = ['width', 'height', 'fps', 'duration', 'crf', 'opacity', 'previous', 'next', 'grid', 'exportOverlap'];
 let saveTimer, restoring = true, saveFailed = false;
 function toast(message) { $('toast').textContent = message; $('toast').style.display = 'block'; clearTimeout(toast.timer); toast.timer = setTimeout(() => $('toast').style.display = 'none', 4500); }
 function projectState() {
@@ -24,7 +24,7 @@ function validateProject(project, portable = false) {
   for (const [id, min, max, integer] of [['width',64,3840,true], ['height',64,3840,true], ['fps',1,60,true], ['duration',0.02,60,false], ['crf',0,51,true], ['opacity',0,100,false]]) {
     if (typeof s[id] !== 'string' || !s[id].trim() || !validNumber(Number(s[id]), min, max) || (integer && !Number.isInteger(Number(s[id])))) throw Error('Invalid project settings.');
   }
-  if (+s.width % 2 || +s.height % 2 || ['previous', 'next', 'grid'].some(id => typeof s[id] !== 'boolean')) throw Error('Invalid project settings.');
+  if (+s.width % 2 || +s.height % 2 || ['previous', 'next', 'grid'].some(id => typeof s[id] !== 'boolean') || (s.exportOverlap !== undefined && typeof s.exportOverlap !== 'boolean')) throw Error('Invalid project settings.');
 }
 function applyProject(project) {
   if (playing) { clearInterval(playing); playing = null; $('play').textContent = '▶ Preview'; }
@@ -126,10 +126,11 @@ $('play').onclick = () => { if (playing) { clearInterval(playing); playing = nul
 $('exportTop').onclick = () => $('exportDialog').showModal(); $('close').onclick = () => $('exportDialog').close();
 for (const id of ['width', 'height']) $(id).onchange = () => { const w = +$('width').value, h = +$('height').value; if (w >= 64 && w <= 3840 && h >= 64 && h <= 3840 && w % 2 === 0 && h % 2 === 0) { canvas.width = w; canvas.height = h; refresh(); } };
 for (const id of ['fps', 'duration', 'crf']) $(id).addEventListener('change', scheduleSave);
+$('exportOverlap').addEventListener('change', scheduleSave);
 window.addEventListener('pagehide', () => { clearTimeout(saveTimer); saveState(); });
 $('renderForm').onsubmit = async e => { e.preventDefault(); if (!frames.length) return toast('Add at least one photo first.'); const width = +$('width').value, height = +$('height').value; if (width % 2 || height % 2) return toast('Width and height must be even numbers.');
   $('renderButton').disabled = true; $('download').hidden = true; $('renderStatus').textContent = 'Starting render…';
-  try { const response = await fetch('/api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frames: frames.map(({ id, x, y, scale, rotation }) => ({ id, x, y, scale, rotation })), width, height, fps: +$('fps').value, duration: +$('duration').value, crf: +$('crf').value }) }); let job = await response.json(); if (!response.ok) throw Error(job.error);
+  try { const response = await fetch('/api/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frames: frames.map(({ id, x, y, scale, rotation }) => ({ id, x, y, scale, rotation })), width, height, fps: +$('fps').value, duration: +$('duration').value, crf: +$('crf').value, overlap: $('exportOverlap').checked }) }); let job = await response.json(); if (!response.ok) throw Error(job.error);
     while (job.status === 'rendering') { $('renderStatus').textContent = `Rendering… ${job.progress}%`; await new Promise(resolve => setTimeout(resolve, 1000)); const poll = await fetch(`/api/render/${job.id}`); job = await poll.json(); if (!poll.ok) throw Error(job.error); }
     if (job.status === 'error') throw Error(job.error); $('renderStatus').textContent = 'Your video is ready.'; $('download').href = job.url; $('download').hidden = false;
   } catch (error) { $('renderStatus').textContent = `Render failed: ${error.message}`; } finally { $('renderButton').disabled = false; }

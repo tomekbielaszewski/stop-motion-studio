@@ -30,8 +30,9 @@ function run(args) {
 }
 function number(value, min, max) { return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max; }
 app.post('/api/render', (req, res) => {
-  const { frames, width, height, fps, duration, crf } = req.body;
+  const { frames, width, height, fps, duration, crf, overlap = false } = req.body;
   if (!Array.isArray(frames) || !frames.length || frames.length > 500 || !Number.isInteger(width) || !Number.isInteger(height) || !number(width, 64, 3840) || !number(height, 64, 3840) || width % 2 || height % 2 || !Number.isInteger(fps) || !number(fps, 1, 60) || !number(duration, 0.02, 60) || !Number.isInteger(crf) || !number(crf, 0, 51) || frames.some(f => !f || !/^[a-f0-9]{32}$/.test(f.id) || !fs.existsSync(path.join(uploads, f.id)) || !number(f.x, -5, 5) || !number(f.y, -5, 5) || !number(f.scale, 0.1, 10) || (f.rotation !== undefined && !number(f.rotation, -360, 360)))) return res.status(400).json({ error: 'Invalid render settings or frames.' });
+  if (typeof overlap !== 'boolean') return res.status(400).json({ error: 'Invalid render settings or frames.' });
   const id = crypto.randomUUID();
   const dir = path.join(jobsDir, id);
   fs.mkdirSync(dir);
@@ -46,13 +47,23 @@ app.post('/api/render', (req, res) => {
         const angle = (f.rotation || 0) * Math.PI / 180;
         const filter = `scale=w='max(1,round(min(${width}/iw,${height}/ih)*iw*${f.scale}))':h='max(1,round(min(${width}/iw,${height}/ih)*ih*${f.scale}))',format=rgba,rotate=${angle}:ow='rotw(${angle})':oh='roth(${angle})':c=none[photo];color=c=black:s=${width}x${height}[bg];[bg][photo]overlay=x='(W-w)/2+${f.x * width}':y='(H-h)/2+${f.y * height}':shortest=1,format=rgb24`;
         await run(['-i', path.join(uploads, f.id), '-filter_complex', filter, '-frames:v', '1', '-threads', '1', path.join(dir, `${i}.png`)]);
-        job.progress = Math.round((i + 1) / frames.length * 80);
+        job.progress = Math.round((i + 1) / (frames.length + (overlap ? frames.length - 1 : 0)) * 80);
       }
-      const list = frames.map((_, i) => `file '${i}.png'\noption framerate 1000\nduration ${duration}\n`).join('') + `file '${frames.length - 1}.png'\noption framerate 1000\n`;
+      const sequence = [];
+      for (let i = 0; i < frames.length; i++) {
+        sequence.push(`${i}.png`);
+        if (overlap && i + 1 < frames.length) {
+          const name = `overlap-${i}.png`;
+          await run(['-i', path.join(dir, `${i}.png`), '-i', path.join(dir, `${i + 1}.png`), '-filter_complex', '[0:v][1:v]blend=all_mode=average', '-frames:v', '1', '-threads', '1', path.join(dir, name)]);
+          sequence.push(name);
+          job.progress = Math.round((frames.length + i + 1) / (frames.length * 2 - 1) * 80);
+        }
+      }
+      const list = sequence.map(name => `file '${name}'\noption framerate 1000\nduration ${duration}\n`).join('') + `file '${sequence[sequence.length - 1]}'\noption framerate 1000\n`;
       fs.writeFileSync(path.join(dir, 'frames.txt'), list);
-      await run(['-f', 'concat', '-safe', '0', '-i', path.join(dir, 'frames.txt'), '-t', String(frames.length * duration), '-vf', `fps=${fps},format=yuv420p`, '-c:v', 'libx264', '-crf', String(crf), '-movflags', '+faststart', path.join(dir, 'video.mp4')]);
+      await run(['-f', 'concat', '-safe', '0', '-i', path.join(dir, 'frames.txt'), '-t', String(sequence.length * duration), '-vf', `fps=${fps},format=yuv420p`, '-c:v', 'libx264', '-crf', String(crf), '-movflags', '+faststart', path.join(dir, 'video.mp4')]);
       job.progress = 100; job.status = 'done'; job.url = `/api/render/${id}/download`;
-      for (let i = 0; i < frames.length; i++) fs.rmSync(path.join(dir, `${i}.png`), { force: true });
+      for (const name of sequence) fs.rmSync(path.join(dir, name), { force: true });
       fs.rmSync(path.join(dir, 'frames.txt'), { force: true });
     } catch (error) { job.status = 'error'; job.error = error.message; }
   })();
