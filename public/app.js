@@ -62,11 +62,11 @@ $('importProject').onchange = async e => {
     validateProject(project); applyProject(project); saveState(); toast('Project imported.');
   } catch (error) { toast(`Could not import project: ${error.message}`); } finally { e.target.value = ''; }
 };
-function drawFrame(frame, alpha = 1) {
+function drawFrame(frame, alpha = 1, target = canvas, context = ctx) {
   if (!frame || !frame.image.complete || !frame.image.naturalWidth) return;
-  const img = frame.image, fit = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight) * frame.scale;
+  const img = frame.image, fit = Math.min(target.width / img.naturalWidth, target.height / img.naturalHeight) * frame.scale;
   const w = img.naturalWidth * fit, h = img.naturalHeight * fit;
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(canvas.width / 2 + frame.x * canvas.width, canvas.height / 2 + frame.y * canvas.height); ctx.rotate(frame.rotation * Math.PI / 180); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore();
+  context.save(); context.globalAlpha = alpha; context.translate(target.width / 2 + frame.x * target.width, target.height / 2 + frame.y * target.height); context.rotate(frame.rotation * Math.PI / 180); context.drawImage(img, -w / 2, -h / 2, w, h); context.restore();
 }
 function draw() {
   scheduleSave();
@@ -123,7 +123,39 @@ $('remove').onclick = () => { frames.splice(selected, 1); selected = Math.min(se
 function move(delta) { const target = selected + delta; if (target < 0 || target >= frames.length) return; [frames[selected], frames[target]] = [frames[target], frames[selected]]; selected = target; refresh(); }
 $('left').onclick = () => move(-1); $('right').onclick = () => move(1);
 $('play').onclick = () => { if (playing) { clearInterval(playing); playing = null; $('play').textContent = '▶ Preview'; return; } const seconds = Math.max(.02, +$('duration').value || .25); $('play').textContent = '■ Stop'; playing = setInterval(() => { selected = (selected + 1) % frames.length; refresh(); }, seconds * 1000); };
-$('exportTop').onclick = () => $('exportDialog').showModal(); $('close').onclick = () => $('exportDialog').close();
+const previewCanvas = $('previewCanvas'), previewCtx = previewCanvas.getContext('2d'), blendCanvas = document.createElement('canvas'), blendCtx = blendCanvas.getContext('2d');
+let previewRequest = null, previewStart = 0;
+function showExportFrame(index) {
+  const outputWidth = +$('width').value, outputHeight = +$('height').value;
+  const validSize = outputWidth >= 64 && outputWidth <= 3840 && outputHeight >= 64 && outputHeight <= 3840 && outputWidth % 2 === 0 && outputHeight % 2 === 0;
+  const sourceWidth = validSize ? outputWidth : canvas.width, sourceHeight = validSize ? outputHeight : canvas.height;
+  const factor = Math.min(640 / sourceWidth, 360 / sourceHeight);
+  const width = Math.max(1, Math.round(sourceWidth * factor)), height = Math.max(1, Math.round(sourceHeight * factor));
+  if (previewCanvas.width !== width || previewCanvas.height !== height) { previewCanvas.width = width; previewCanvas.height = height; }
+  if (blendCanvas.width !== width || blendCanvas.height !== height) { blendCanvas.width = width; blendCanvas.height = height; }
+  previewCtx.fillStyle = '#000'; previewCtx.fillRect(0, 0, width, height);
+  if (!frames.length) { $('previewLabel').textContent = 'Add photos to preview'; return; }
+  const overlap = $('exportOverlap').checked, first = overlap ? Math.floor(index / 2) : index;
+  drawFrame(frames[first], 1, previewCanvas, previewCtx);
+  if (overlap && index % 2) {
+    blendCtx.fillStyle = '#000'; blendCtx.fillRect(0, 0, width, height); drawFrame(frames[first + 1], 1, blendCanvas, blendCtx);
+    previewCtx.save(); previewCtx.globalAlpha = 0.5; previewCtx.drawImage(blendCanvas, 0, 0); previewCtx.restore();
+  }
+  $('previewLabel').textContent = overlap && index % 2 ? `Frames ${first + 1} + ${first + 2}` : `Frame ${first + 1} / ${frames.length}`;
+}
+function stopExportPreview() { if (previewRequest !== null) cancelAnimationFrame(previewRequest); previewRequest = null; $('previewExport').textContent = '▶ Preview'; }
+function animateExportPreview(now) {
+  const duration = Math.max(0.02, Math.min(60, +$('duration').value || 0.25));
+  const count = $('exportOverlap').checked ? frames.length * 2 - 1 : frames.length;
+  if (!count) { stopExportPreview(); showExportFrame(0); return; }
+  showExportFrame(Math.floor((now - previewStart) / (duration * 1000)) % count);
+  previewRequest = requestAnimationFrame(animateExportPreview);
+}
+$('previewExport').onclick = () => { if (previewRequest !== null) { stopExportPreview(); return; } if (!frames.length) return toast('Add at least one photo first.'); previewStart = performance.now(); $('previewExport').textContent = '■ Stop'; previewRequest = requestAnimationFrame(animateExportPreview); };
+$('exportTop').onclick = () => { if (playing) $('play').click(); showExportFrame(0); $('exportDialog').showModal(); };
+$('close').onclick = () => $('exportDialog').close();
+$('exportDialog').addEventListener('close', stopExportPreview);
+for (const id of ['exportOverlap', 'duration', 'width', 'height']) $(id).addEventListener('change', () => { previewStart = performance.now(); showExportFrame(0); });
 for (const id of ['width', 'height']) $(id).onchange = () => { const w = +$('width').value, h = +$('height').value; if (w >= 64 && w <= 3840 && h >= 64 && h <= 3840 && w % 2 === 0 && h % 2 === 0) { canvas.width = w; canvas.height = h; refresh(); } };
 for (const id of ['fps', 'duration', 'crf']) $(id).addEventListener('change', scheduleSave);
 $('exportOverlap').addEventListener('change', scheduleSave);

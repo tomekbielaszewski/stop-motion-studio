@@ -16,7 +16,7 @@ Open http://localhost:3000. Uploaded photos and exports are stored in the `stopm
 2. Select a frame and drag it to reposition; adjust scale, rotation and precise offsets in the sidebar. Use the grid and previous/next onion-skin overlays to align photos. Use the arrows to reorder and Preview to play the sequence.
 3. Open **Export video**, set an even output width and height, frame rate, seconds per photo and quality (CRF), and render. Download the resulting H.264 MP4 when ready. The canvas aspect ratio follows the export dimensions.
 
-The optional **Insert 50% frame overlaps** export setting adds a blend of each pair of adjacent aligned frames between the originals. Each blend lasts the same number of seconds as a photo, so three photos at one second each produce a five-second video. The editor's onion-skin and grid settings do not appear in the export.
+The export dialog has an instant browser-side preview so you can check the sequence before rendering. The optional **Insert 50% frame overlaps** export setting adds a blend of each pair of adjacent aligned frames between the originals. Each blend lasts the same number of seconds as a photo, so three photos at one second each produce a five-second video. The editor's onion-skin and grid settings do not appear in the preview or export. The rendered video may differ slightly from the preview due to frame-rate quantization and encoding.
 
 Photos are fit within a black output canvas before the per-frame scale and position are applied. The video frame rate quantizes photo timing to the nearest available video frames. Exports may need significant disk space and time, especially for large images and resolutions.
 
